@@ -11,9 +11,9 @@ const SOUND_FILES = {
   birds: "/sounds/birds.mp3",
 };
 
-const STORAGE_TRACKS = "rainy-cup-corner-tracks-v5";
-const STORAGE_CUSTOM_PRESET = "rainy-cup-corner-custom-preset-v5";
-const STORAGE_THEME = "rainy-cup-corner-theme-v5";
+const STORAGE_TRACKS = "rainy-cup-corner-tracks-v6";
+const STORAGE_CUSTOM_PRESET = "rainy-cup-corner-custom-preset-v6";
+const STORAGE_THEME = "rainy-cup-corner-theme-v6";
 
 const DEFAULT_TRACKS = [
   { id: "rain", name: "Rain", icon: CloudRain, volume: 65, enabled: true, color: "blue" },
@@ -262,11 +262,12 @@ function App() {
 
         <section className="hero">
           <div className="heroText">
-            <span className="eyebrow"><Sparkles size={13} /> {isNight ? "night rain" : "soft mode"}</span>
+            <span className="eyebrow"><Sparkles size={13} /> {isNight ? "moonlit rain" : "soft mode"}</span>
             <h2>Make today a little softer.</h2>
             <p>Blend rain, wind, cafe air, and birdsong into one quiet corner.</p>
           </div>
           <div className="window" aria-hidden="true">
+            <div className="moonCloud"><span></span><b></b></div>
             <div className="glass"><i /><i /><i /><i /></div>
             <div className="cup">☕</div>
           </div>
@@ -315,7 +316,7 @@ function App() {
                 {activeTracks.length ? activeTracks.map(t => <span key={t.id}>{t.name}</span>) : <span>No active sounds</span>}
               </div>
             </div>
-            <button className="play" onClick={isPlaying ? pause : start} aria-label={isPlaying ? "Pause" : "Play"}>{isPlaying ? <Pause size={28} /> : <Play size={28} />}</button>
+            <button className="play" onClick={isPlaying ? pause : start} aria-label={isPlaying ? "Pause" : "Play"}>{isPlaying ? <Pause size={30} /> : <Play size={30} />}</button>
           </div>
 
           <button className="saveMix" onClick={saveCurrentMix}>
@@ -338,12 +339,12 @@ function SoundControl({ track, onToggle, onVolume }) {
     <article className={`track ${track.color}`}>
       <div className="trackTop">
         <div className="trackName">
-          <div className="trackIcon"><Icon size={19} /></div>
+          <div className="trackIcon"><Icon size={21} /></div>
           <div><h4>{track.name}</h4><p>{track.enabled ? "enabled" : "muted"}</p></div>
         </div>
         <button aria-label={`Toggle ${track.name}`} onClick={onToggle} className={`toggle ${track.enabled ? "on" : ""}`}><span /></button>
       </div>
-      <div className="volume"><Volume2 size={15} /><input type="range" min="0" max="100" value={track.volume} onChange={e => onVolume(e.target.value)} /><strong>{track.volume}%</strong></div>
+      <div className="volume"><Volume2 size={16} /><input type="range" min="0" max="100" value={track.volume} onChange={e => onVolume(e.target.value)} /><strong>{track.volume}%</strong></div>
     </article>
   );
 }
