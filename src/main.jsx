@@ -551,10 +551,12 @@ function SoundControl({ track, onToggle, onVolume }) {
         <Volume2 size={16} />
         <input
           type="range"
+          aria-label={`${track.name} volume`}
           min="0"
           max="100"
           value={track.volume}
-          onChange={(event) => onVolume(event.target.value)}
+          onInput={(event) => onVolume(event.currentTarget.value)}
+          onChange={(event) => onVolume(event.currentTarget.value)}
         />
         <strong>{track.volume}%</strong>
       </div>
