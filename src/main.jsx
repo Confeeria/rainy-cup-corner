@@ -1,568 +1,250 @@
-
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createRoot } from "react-dom/client";
-import {
-  Bird,
-  BookmarkPlus,
-  CloudRain,
-  Coffee,
-  Moon,
-  Pause,
-  Play,
-  SlidersHorizontal,
-  Sparkles,
-  Sun,
-  Timer,
-  Volume2,
-  Wind,
-} from "lucide-react";
-import "./styles.css";
-
-const SOUND_FILES = {
-  rain: "/sounds/rain.mp3",
-  wind: "/sounds/wind.mp3",
-  cafe: "/sounds/cafe.mp3",
-  birds: "/sounds/birds.mp3",
-};
-
-const STORAGE_TRACKS = "rainy-cup-corner-tracks-v8";
-const STORAGE_CUSTOM_PRESET = "rainy-cup-corner-custom-preset-v8";
-const STORAGE_THEME = "rainy-cup-corner-theme-v8";
-
-const TRACK_META = {
-  rain: { id: "rain", name: "Rain", icon: CloudRain, color: "blue" },
-  wind: { id: "wind", name: "Soft Wind", icon: Wind, color: "lavender" },
-  cafe: { id: "cafe", name: "Quiet Cafe", icon: Coffee, color: "sage" },
-  birds: { id: "birds", name: "Birdsong", icon: Bird, color: "peach" },
-};
-
-const DEFAULT_TRACK_SETTINGS = [
-  { id: "rain", volume: 65, enabled: true },
-  { id: "wind", volume: 25, enabled: true },
-  { id: "cafe", volume: 20, enabled: true },
-  { id: "birds", volume: 12, enabled: true },
-];
-
-function hydrateTracks(settings) {
-  const byId = new Map((settings || DEFAULT_TRACK_SETTINGS).map((track) => [track.id, track]));
-  return DEFAULT_TRACK_SETTINGS.map((fallback) => {
-    const saved = byId.get(fallback.id) || fallback;
-    return {
-      ...TRACK_META[fallback.id],
-      volume: Number.isFinite(Number(saved.volume)) ? Number(saved.volume) : fallback.volume,
-      enabled: typeof saved.enabled === "boolean" ? saved.enabled : fallback.enabled,
-    };
-  });
+input {
+  font: inherit;
 }
 
-const DEFAULT_TRACKS = hydrateTracks(DEFAULT_TRACK_SETTINGS);
-
-const BASE_PRESETS = [
-  {
-    id: "rainy-cafe",
-    name: "Rainy Cafe",
-    desc: "Rain, wind, cafe warmth.",
-    emoji: "🌧️",
-    values: { rain: 65, wind: 25, cafe: 20, birds: 12 },
-  },
-  {
-    id: "window-breeze",
-    name: "Window Breeze",
-    desc: "Soft wind and distant birds.",
-    emoji: "🌬️",
-    values: { rain: 25, wind: 45, cafe: 10, birds: 18 },
-  },
-  {
-    id: "sleepy-rain",
-    name: "Sleepy Rain",
-    desc: "Mostly rain, fewer details.",
-    emoji: "🌙",
-    values: { rain: 75, wind: 18, cafe: 0, birds: 0 },
-  },
-];
-
-const TIMERS = [
-  { label: "15", sub: "min", minutes: 15 },
-  { label: "30", sub: "min", minutes: 30 },
-  { label: "60", sub: "min", minutes: 60 },
-  { label: "∞", sub: "no timer", minutes: null },
-];
-
-function loadSavedTracks() {
-  try {
-    const saved = localStorage.getItem(STORAGE_TRACKS);
-    return saved ? hydrateTracks(JSON.parse(saved)) : DEFAULT_TRACKS;
-  } catch {
-    return DEFAULT_TRACKS;
-  }
+button {
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
-function serializeTracks(tracks) {
-  return tracks.map(({ id, volume, enabled }) => ({ id, volume, enabled }));
+.stage {
+  min-height: 100vh;
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  position: relative;
+  overflow-x: hidden;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
-function loadCustomPreset() {
-  try {
-    const saved = localStorage.getItem(STORAGE_CUSTOM_PRESET);
-    return saved ? JSON.parse(saved) : null;
-  } catch {
-    return null;
-  }
+.stage.night {
+  color: #f3efff;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(91, 122, 232, 0.48), transparent 22%),
+    radial-gradient(circle at 76% 74%, rgba(54, 113, 211, 0.45), transparent 28%),
+    linear-gradient(150deg, #2f226d 0%, #3a2a86 36%, #1e4f9a 100%);
 }
 
-function loadTheme() {
-  try {
-    return localStorage.getItem(STORAGE_THEME) || "day";
-  } catch {
-    return "day";
-  }
+.stage.night::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.72;
+  background-image:
+    radial-gradient(circle, rgba(255, 247, 190, 0.86) 0 1.4px, transparent 2px),
+    radial-gradient(circle, rgba(217, 228, 255, 0.72) 0 1px, transparent 1.8px),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px 18px);
+  background-position: 22px 34px, 74px 92px, 0 0;
+  background-size: 128px 118px, 176px 154px, 44px 44px;
+  animation: skyDrift 36s linear infinite, skyPulse 7s ease-in-out infinite alternate;
 }
 
-function App() {
-  const [tracks, setTracks] = useState(loadSavedTracks);
-  const [customPreset, setCustomPreset] = useState(loadCustomPreset);
-  const [theme, setTheme] = useState(loadTheme);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [timer, setTimer] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(null);
-  const [activePreset, setActivePreset] = useState("rainy-cafe");
-  const [note, setNote] = useState("");
-  const [saveMessage, setSaveMessage] = useState("");
-  const [imageErrors, setImageErrors] = useState({ day: false, night: false });
-
-  const audioRefs = useRef({});
-  const timerRef = useRef(null);
-  const saveMessageRef = useRef(null);
-
-  const isNight = theme === "night";
-  const sceneKey = isNight ? "night" : "day";
-  const sceneImagePath = isNight ? "/images/night-window.png" : "/images/day-window.png";
-  const showSceneImage = !imageErrors[sceneKey];
-
-  const activeTracks = useMemo(
-    () => tracks.filter((track) => track.enabled && track.volume > 0),
-    [tracks]
-  );
-
-  const presets = useMemo(() => {
-    const myMix =
-      customPreset ??
-      {
-        id: "my-cozy-mix",
-        name: "My Cozy Mix",
-        desc: "Save your current mix first.",
-        emoji: "✨",
-        values: null,
-        isEmpty: true,
-      };
-    return [...BASE_PRESETS, myMix];
-  }, [customPreset]);
-
-  const timerStatus = useMemo(() => {
-    if (timer === null) return "No timer set";
-    if (!isPlaying) return `Timer ready: ${timer} min`;
-    if (timeLeft !== null) return `Stopping in ${formatTime(timeLeft)}`;
-    return `Timer active: ${timer} min`;
-  }, [timer, isPlaying, timeLeft]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_TRACKS, JSON.stringify(serializeTracks(tracks)));
-  }, [tracks]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_THEME, theme);
-  }, [theme]);
-
-  useEffect(() => {
-    return () => {
-      Object.values(audioRefs.current).forEach((audio) => {
-        audio.pause();
-        audio.src = "";
-      });
-      clearInterval(timerRef.current);
-      clearTimeout(saveMessageRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    tracks.forEach((track) => {
-      const audio = getAudio(track.id);
-      audio.volume = track.enabled ? track.volume / 100 : 0;
-
-      if (track.enabled && track.volume > 0 && audio.paused) {
-        audio.play().catch(() => {
-          setNote("Tap Play again if your browser blocks audio at first.");
-        });
-      }
-
-      if (!track.enabled || track.volume === 0) {
-        audio.pause();
-      }
-    });
-  }, [tracks, isPlaying]);
-
-  useEffect(() => {
-    if (!isPlaying || timer === null) {
-      setTimeLeft(null);
-      clearInterval(timerRef.current);
-      return;
-    }
-
-    const endAt = Date.now() + timer * 60 * 1000;
-    setTimeLeft(timer * 60);
-
-    clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      const left = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
-      setTimeLeft(left);
-
-      if (left <= 0) {
-        clearInterval(timerRef.current);
-        fadeOutAndPause();
-      }
-    }, 1000);
-
-    return () => clearInterval(timerRef.current);
-  }, [timer, isPlaying]);
-
-  function getAudio(trackId) {
-    if (!audioRefs.current[trackId]) {
-      const audio = new Audio(SOUND_FILES[trackId]);
-      audio.loop = true;
-      audio.preload = "auto";
-      audioRefs.current[trackId] = audio;
-    }
-    return audioRefs.current[trackId];
-  }
-
-  function startPlayback() {
-    setNote("");
-    tracks.forEach((track) => {
-      const audio = getAudio(track.id);
-      audio.volume = track.enabled ? track.volume / 100 : 0;
-
-      if (track.enabled && track.volume > 0) {
-        audio.play().catch(() => {
-          setNote("Audio files are missing or your browser needs another tap.");
-        });
-      }
-    });
-    setIsPlaying(true);
-  }
-
-  function pausePlayback() {
-    Object.values(audioRefs.current).forEach((audio) => audio.pause());
-    setIsPlaying(false);
-  }
-
-  function fadeOutAndPause() {
-    const steps = 20;
-    let currentStep = 0;
-
-    const originalVolumes = {};
-    tracks.forEach((track) => {
-      originalVolumes[track.id] = track.volume / 100;
-    });
-
-    const fade = setInterval(() => {
-      currentStep += 1;
-      const ratio = Math.max(0, 1 - currentStep / steps);
-
-      tracks.forEach((track) => {
-        const audio = audioRefs.current[track.id];
-        if (audio) audio.volume = originalVolumes[track.id] * ratio;
-      });
-
-      if (currentStep >= steps) {
-        clearInterval(fade);
-        pausePlayback();
-      }
-    }, 600);
-  }
-
-  function toggleTrack(trackId) {
-    setTracks((prev) =>
-      prev.map((track) =>
-        track.id === trackId ? { ...track, enabled: !track.enabled } : track
-      )
-    );
-  }
-
-  function updateVolume(trackId, volume) {
-    setTracks((prev) =>
-      prev.map((track) =>
-        track.id === trackId
-          ? { ...track, volume: Number(volume), enabled: Number(volume) > 0 }
-          : track
-      )
-    );
-  }
-
-  function applyPreset(preset) {
-    if (!preset.values) {
-      setSaveMessage("Adjust your mix, then tap Save Mix ✨");
-      clearTimeout(saveMessageRef.current);
-      saveMessageRef.current = setTimeout(() => setSaveMessage(""), 2400);
-      return;
-    }
-
-    setActivePreset(preset.id);
-    setTracks((prev) =>
-      prev.map((track) => {
-        const volume = preset.values[track.id] ?? 0;
-        return { ...track, volume, enabled: volume > 0 };
-      })
-    );
-  }
-
-  function saveCurrentMix() {
-    const values = {};
-    tracks.forEach((track) => {
-      values[track.id] = track.enabled ? track.volume : 0;
-    });
-
-    const savedPreset = {
-      id: "my-cozy-mix",
-      name: "My Cozy Mix",
-      desc: "Your saved rainy corner.",
-      emoji: "✨",
-      values,
-      isEmpty: false,
-    };
-
-    localStorage.setItem(STORAGE_CUSTOM_PRESET, JSON.stringify(savedPreset));
-    setCustomPreset(savedPreset);
-    setActivePreset("my-cozy-mix");
-    setSaveMessage("Saved My Cozy Mix ✨");
-    clearTimeout(saveMessageRef.current);
-    saveMessageRef.current = setTimeout(() => setSaveMessage(""), 2400);
-  }
-
-  function formatTime(seconds) {
-    if (seconds === null) return "";
-    const mins = Math.floor(seconds / 60);
-    const secs = String(seconds % 60).padStart(2, "0");
-    return `${mins}:${secs}`;
-  }
-
-  return (
-    <main className={`stage ${isNight ? "night" : ""}`}>
-      <div className="app">
-        <header className="topbar">
-          <div className="brand">
-            <div className="brandIcon">
-              <CloudRain size={20} />
-            </div>
-            <div>
-              <h1>Rainy Cup Corner</h1>
-              <p>mix your own cozy ambience</p>
-            </div>
-          </div>
-
-          <button
-            className="iconButton"
-            aria-label={isNight ? "Switch to day mode" : "Switch to night mode"}
-            onClick={() => setTheme(isNight ? "day" : "night")}
-          >
-            {isNight ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-        </header>
-
-        <section className="hero">
-          <div className="heroText">
-            <span className="eyebrow">
-              <Sparkles size={14} /> {isNight ? "moonlit rain" : "soft mode"}
-            </span>
-            <h2>Make today a little softer.</h2>
-            <p>Blend rain, wind, cafe air, and birdsong into one quiet corner.</p>
-          </div>
-
-          <div className={`window ${showSceneImage ? "imageWindow" : ""}`} aria-hidden="true">
-            {showSceneImage ? (
-              <img
-                src={sceneImagePath}
-                alt=""
-                onError={() =>
-                  setImageErrors((prev) => ({
-                    ...prev,
-                    [sceneKey]: true,
-                  }))
-                }
-              />
-            ) : (
-              <>
-                {isNight && (
-                  <div className="moonCloud">
-                    <span></span>
-                    <b></b>
-                  </div>
-                )}
-                <div className="glass">
-                  <i></i>
-                  <i></i>
-                  <i></i>
-                  <i></i>
-                </div>
-                <div className="cup">☕</div>
-              </>
-            )}
-          </div>
-        </section>
-
-        <section className="card presetSection">
-          <div className="heading">
-            <h3>Quick Presets</h3>
-            <span>tap to blend</span>
-          </div>
-
-          <div className="presetRow">
-            {presets.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => applyPreset(preset)}
-                className={`preset ${activePreset === preset.id ? "active" : ""} ${
-                  preset.isEmpty ? "emptyPreset" : ""
-                }`}
-              >
-                <span className="presetEmoji">{preset.emoji}</span>
-                <strong>{preset.name}</strong>
-                <small>{preset.desc}</small>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <div className="mainGrid">
-          <section className="card mixer">
-            <div className="heading">
-              <h3>
-                <SlidersHorizontal size={18} /> Sound Mixer
-              </h3>
-              <button
-                className="reset"
-                onClick={() => {
-                  setTracks(DEFAULT_TRACKS);
-                  setActivePreset("rainy-cafe");
-                }}
-              >
-                Reset
-              </button>
-            </div>
-
-            <div className="trackList">
-              {tracks.map((track) => (
-                <SoundControl
-                  key={track.id}
-                  track={track}
-                  onToggle={() => toggleTrack(track.id)}
-                  onVolume={(value) => updateVolume(track.id, value)}
-                />
-              ))}
-            </div>
-          </section>
-
-          <section className="card sleepPanel">
-            <div className="heading">
-              <h3>
-                <Timer size={18} /> Timer
-              </h3>
-              {timeLeft !== null && <span>{formatTime(timeLeft)}</span>}
-            </div>
-
-            <div className="timerGrid">
-              {TIMERS.map((option) => (
-                <button
-                  key={`${option.label}-${option.sub}`}
-                  onClick={() => setTimer(option.minutes)}
-                  className={`timer ${timer === option.minutes ? "active" : ""}`}
-                >
-                  <strong>{option.label}</strong>
-                  <small>{option.sub}</small>
-                </button>
-              ))}
-            </div>
-
-            <div className={`timerStatus ${timer !== null ? "active" : ""}`}>
-              {timerStatus}
-            </div>
-
-            <div className="nowPlaying">
-              <div>
-                <h3>Now Playing</h3>
-                <div className="pills">
-                  {activeTracks.length ? (
-                    activeTracks.map((track) => <span key={track.id}>{track.name}</span>)
-                  ) : (
-                    <span>No active sounds</span>
-                  )}
-                </div>
-              </div>
-
-              <button
-                className="play"
-                onClick={isPlaying ? pausePlayback : startPlayback}
-                aria-label={isPlaying ? "Pause" : "Play"}
-              >
-                {isPlaying ? <Pause size={30} /> : <Play size={30} />}
-              </button>
-            </div>
-
-            <button className="saveMix" onClick={saveCurrentMix}>
-              <BookmarkPlus size={18} /> Save Mix
-            </button>
-
-            {saveMessage && <p className="saveMessage">{saveMessage}</p>}
-            {note && <p className="note">{note}</p>}
-          </section>
-        </div>
-      </div>
-    </main>
-  );
+.app {
+  position: relative;
+  z-index: 1;
 }
 
-function SoundControl({ track, onToggle, onVolume }) {
-  const Icon = track.icon || CloudRain;
-
-  return (
-    <article className={`track ${track.color}`}>
-      <div className="trackTop">
-        <div className="trackName">
-          <div className="trackIcon">
-            <Icon size={21} />
-          </div>
-          <div>
-            <h4>{track.name}</h4>
-            <p>{track.enabled ? "enabled" : "muted"}</p>
-          </div>
-        </div>
-
-        <button
-          aria-label={`Toggle ${track.name}`}
-          onClick={onToggle}
-          className={`toggle ${track.enabled ? "on" : ""}`}
-        >
-          <span></span>
-        </button>
-      </div>
-
-      <div className="volume">
-        <Volume2 size={16} />
-        <input
-          type="range"
-          aria-label={`${track.name} volume`}
-          min="0"
-          max="100"
-          value={track.volume}
-          onChange={(event) => onVolume(event.target.value)}
-          onInput={(event) => onVolume(event.currentTarget.value)}
-          onChange={(event) => onVolume(event.currentTarget.value)}
-        />
-        <strong>{track.volume}%</strong>
-      </div>
-    </article>
-  );
+.app {
+  width: min(100%, 1040px);
+  margin: 0 auto;
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brandIcon,
+.iconButton {
+  width: 50px;
+  height: 50px;
+  border: 0;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, var(--blue), rgba(255, 255, 255, 0.72));
+  color: #5f7481;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.iconButton {
+  background: rgba(255, 255, 255, 0.62);
+  color: #8a7363;
+}
+
+.night .brandIcon {
+  background: linear-gradient(145deg, #5c68da, #948bf0);
+  color: #fff7c8;
+}
+
+.night .iconButton {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff6b9;
+}
+
+.iconButton:active,
+.preset:active,
+.reset:active,
+.timer:active,
+.toggle:active,
+.play:active,
+.saveMix:active {
+  transform: scale(0.98);
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.55rem;
+  letter-spacing: 0;
+  color: #654f43;
+}
+
+.night h1 {
+  color: #fff8d7;
+}
+
+.brand p {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.night .brand p,
+.night .heading span,
+.night .track p,
+.night .hero p,
+.night .note,
+.night .saveMessage {
+  color: #d7d2ff;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 32px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(250, 236, 225, 0.7));
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  box-shadow: 0 16px 44px rgba(103, 70, 53, 0.1);
+}
+
+.night .hero {
+  background:
+    radial-gradient(circle at 82% 18%, rgba(255, 242, 170, 0.18), transparent 24%),
+    linear-gradient(150deg, rgba(66, 49, 154, 0.84), rgba(28, 76, 153, 0.62));
+  border-color: rgba(255, 238, 180, 0.42);
+  box-shadow: 0 24px 64px rgba(7, 8, 42, 0.32), inset 0 0 46px rgba(126, 151, 255, 0.18);
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #8a7363;
+  font-size: 0.9rem;
+}
+
+.night .eyebrow {
+  color: #fff6b9;
+}
+
+.hero h2 {
+  margin-top: 12px;
+  max-width: 360px;
+  font-size: 2.6rem;
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.hero p {
+  margin-top: 12px;
+  max-width: 370px;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.window {
+  position: relative;
+  min-height: 220px;
+  overflow: hidden;
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 78% 30%, rgba(255, 237, 191, 0.8), transparent 18%),
+    linear-gradient(150deg, rgba(203, 226, 236, 0.94), rgba(229, 217, 243, 0.78));
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  isolation: isolate;
+}
+
+.window::before,
+.window::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.window::before {
+  opacity: 0.58;
+  background-image:
+    radial-gradient(circle, rgba(255, 244, 190, 0.9) 0 1.7px, transparent 2.8px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.72) 0 1px, transparent 2px),
+    radial-gradient(circle, rgba(198, 231, 238, 0.52) 0 1.2px, transparent 2.4px);
+  background-position: 20px 34px, 78px 18px, 118px 86px;
+  background-size: 86px 74px, 130px 96px, 108px 82px;
+  animation: daylightGlints 22s linear infinite;
+}
+
+.window::after {
+  opacity: 0.48;
+  background:
+    radial-gradient(circle at 18% 28%, rgba(255, 242, 184, 0.86) 0 2.2px, transparent 4px),
+    radial-gradient(circle at 44% 16%, rgba(255, 255, 255, 0.78) 0 1.6px, transparent 3px),
+    radial-gradient(circle at 74% 42%, rgba(255, 232, 203, 0.7) 0 2px, transparent 3.6px),
+    radial-gradient(circle at 62% 76%, rgba(194, 228, 236, 0.5) 0 1.5px, transparent 3px);
+  animation: daylightTwinkle 4.4s ease-in-out infinite alternate;
+}
+
+.night .window {
+  background:
+    radial-gradient(circle at 68% 20%, rgba(255, 246, 186, 0.9), transparent 12%),
+    radial-gradient(circle at 78% 78%, rgba(43, 125, 214, 0.65), transparent 27%),
+    linear-gradient(150deg, rgba(65, 50, 160, 0.96), rgba(31, 83, 168, 0.86));
+  border-color: rgba(255, 238, 180, 0.48);
+}
+
+.night .window::before,
+.night .window::after {
+  opacity: 0.9;
+}
+
+.night .window::before {
+  background-image:
+    radial-gradient(circle, rgba(255, 249, 210, 1) 0 1.8px, transparent 2.8px),
+    radial-gradient(circle, rgba(225, 233, 255, 0.86) 0 1.3px, transparent 2.4px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.74) 0 0.8px, transparent 1.7px);
+  background-position: 18px 26px, 86px 54px, 44px 92px;
+  background-size: 82px 66px, 122px 88px, 58px 52px;
+  animation: starDrift 18s linear infinite;
+}
+
+.night .window::after {
