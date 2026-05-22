@@ -131,6 +131,9 @@ function App() {
   const [imageErrors, setImageErrors] = useState({ day: false, night: false });
 
   const audioRefs = useRef({});
+  const audioContextRef = useRef(null);
+  const gainRefs = useRef({});
+  const sourceRefs = useRef({});
   const timerRef = useRef(null);
   const saveMessageRef = useRef(null);
 
@@ -179,6 +182,7 @@ function App() {
         audio.pause();
         audio.src = "";
       });
+      audioContextRef.current?.close();
       clearInterval(timerRef.current);
       clearTimeout(saveMessageRef.current);
     };
@@ -189,7 +193,7 @@ function App() {
 
     tracks.forEach((track) => {
       const audio = getAudio(track.id);
-      audio.volume = track.enabled ? track.volume / 100 : 0;
+      setAudioVolume(track.id, track.enabled ? track.volume / 100 : 0);
 
       if (track.enabled && track.volume > 0 && audio.paused) {
         audio.play().catch(() => {
@@ -234,14 +238,69 @@ function App() {
       audio.preload = "auto";
       audioRefs.current[trackId] = audio;
     }
+    connectAudio(trackId, audioRefs.current[trackId]);
     return audioRefs.current[trackId];
+  }
+
+  function getAudioContext() {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return null;
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext();
+    }
+
+    return audioContextRef.current;
+  }
+
+  function connectAudio(trackId, audio) {
+    if (sourceRefs.current[trackId]) return;
+
+    const audioContext = getAudioContext();
+    if (!audioContext) return;
+
+    const source = audioContext.createMediaElementSource(audio);
+    const gain = audioContext.createGain();
+
+    source.connect(gain);
+    gain.connect(audioContext.destination);
+
+    sourceRefs.current[trackId] = source;
+    gainRefs.current[trackId] = gain;
+  }
+
+  function setAudioVolume(trackId, volume) {
+    const gain = gainRefs.current[trackId];
+    const audio = audioRefs.current[trackId];
+    const audioContext = audioContextRef.current;
+
+    if (gain && audioContext) {
+      if (audio) audio.volume = 1;
+      gain.gain.setTargetAtTime(volume, audioContext.currentTime, 0.015);
+      return;
+    }
+
+    if (audio) {
+      audio.volume = volume;
+    }
+  }
+
+  function resumeAudioContext() {
+    const audioContext = getAudioContext();
+    if (audioContext?.state === "suspended") {
+      audioContext.resume().catch(() => {
+        setNote("Tap Play again if your browser blocks audio at first.");
+      });
+    }
   }
 
   function startPlayback() {
     setNote("");
+    resumeAudioContext();
+
     tracks.forEach((track) => {
       const audio = getAudio(track.id);
-      audio.volume = track.enabled ? track.volume / 100 : 0;
+      setAudioVolume(track.id, track.enabled ? track.volume / 100 : 0);
 
       if (track.enabled && track.volume > 0) {
         audio.play().catch(() => {
@@ -271,8 +330,7 @@ function App() {
       const ratio = Math.max(0, 1 - currentStep / steps);
 
       tracks.forEach((track) => {
-        const audio = audioRefs.current[track.id];
-        if (audio) audio.volume = originalVolumes[track.id] * ratio;
+        setAudioVolume(track.id, originalVolumes[track.id] * ratio);
       });
 
       if (currentStep >= steps) {
