@@ -1,7 +1,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Bird, BookmarkPlus, CloudRain, Coffee, Moon, Pause, Play, SlidersHorizontal, Sparkles, Timer, Volume2, Wind } from "lucide-react";
+import { Bird, BookmarkPlus, CloudRain, Coffee, Moon, Pause, Play, SlidersHorizontal, Sparkles, Sun, Timer, Volume2, Wind } from "lucide-react";
 import "./styles.css";
 
 const SOUND_FILES = {
@@ -11,8 +11,9 @@ const SOUND_FILES = {
   birds: "/sounds/birds.mp3",
 };
 
-const STORAGE_TRACKS = "rainy-cup-corner-tracks-v4";
-const STORAGE_CUSTOM_PRESET = "rainy-cup-corner-custom-preset-v4";
+const STORAGE_TRACKS = "rainy-cup-corner-tracks-v5";
+const STORAGE_CUSTOM_PRESET = "rainy-cup-corner-custom-preset-v5";
+const STORAGE_THEME = "rainy-cup-corner-theme-v5";
 
 const DEFAULT_TRACKS = [
   { id: "rain", name: "Rain", icon: CloudRain, volume: 65, enabled: true, color: "blue" },
@@ -52,9 +53,18 @@ function loadCustomPreset() {
   }
 }
 
+function loadTheme() {
+  try {
+    return localStorage.getItem(STORAGE_THEME) || "day";
+  } catch {
+    return "day";
+  }
+}
+
 function App() {
   const [tracks, setTracks] = useState(loadSavedTracks);
   const [customPreset, setCustomPreset] = useState(loadCustomPreset);
+  const [theme, setTheme] = useState(loadTheme);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timer, setTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
@@ -64,6 +74,8 @@ function App() {
   const audioRefs = useRef({});
   const timerRef = useRef(null);
   const saveMessageRef = useRef(null);
+
+  const isNight = theme === "night";
 
   const activeTracks = useMemo(() => tracks.filter(t => t.enabled && t.volume > 0), [tracks]);
 
@@ -89,6 +101,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_TRACKS, JSON.stringify(tracks));
   }, [tracks]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_THEME, theme);
+  }, [theme]);
 
   useEffect(() => {
     return () => {
@@ -228,19 +244,25 @@ function App() {
   }
 
   return (
-    <main className="stage">
+    <main className={`stage ${isNight ? "night" : ""}`}>
       <div className="app">
         <header className="topbar">
           <div className="brand">
             <div className="brandIcon"><CloudRain size={20} /></div>
             <div><h1>Rainy Cup Corner</h1><p>mix your own cozy ambience</p></div>
           </div>
-          <button className="iconButton" aria-label="Sleep mode"><Moon size={18} /></button>
+          <button
+            className="iconButton"
+            aria-label={isNight ? "Switch to day mode" : "Switch to night mode"}
+            onClick={() => setTheme(isNight ? "day" : "night")}
+          >
+            {isNight ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
         </header>
 
         <section className="hero">
           <div className="heroText">
-            <span className="eyebrow"><Sparkles size={13} /> soft mode</span>
+            <span className="eyebrow"><Sparkles size={13} /> {isNight ? "night rain" : "soft mode"}</span>
             <h2>Make today a little softer.</h2>
             <p>Blend rain, wind, cafe air, and birdsong into one quiet corner.</p>
           </div>
@@ -250,7 +272,7 @@ function App() {
           </div>
         </section>
 
-        <section className="card">
+        <section className="card presetSection">
           <div className="heading"><h3>Quick Presets</h3><span>tap to blend</span></div>
           <div className="presetRow">
             {presets.map(p => (
