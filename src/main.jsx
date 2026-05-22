@@ -25,16 +25,37 @@ const SOUND_FILES = {
   birds: "/sounds/birds.mp3",
 };
 
-const STORAGE_TRACKS = "rainy-cup-corner-tracks-v7";
-const STORAGE_CUSTOM_PRESET = "rainy-cup-corner-custom-preset-v7";
-const STORAGE_THEME = "rainy-cup-corner-theme-v7";
+const STORAGE_TRACKS = "rainy-cup-corner-tracks-v8";
+const STORAGE_CUSTOM_PRESET = "rainy-cup-corner-custom-preset-v8";
+const STORAGE_THEME = "rainy-cup-corner-theme-v8";
 
-const DEFAULT_TRACKS = [
-  { id: "rain", name: "Rain", icon: CloudRain, volume: 65, enabled: true, color: "blue" },
-  { id: "wind", name: "Soft Wind", icon: Wind, volume: 25, enabled: true, color: "lavender" },
-  { id: "cafe", name: "Quiet Cafe", icon: Coffee, volume: 20, enabled: true, color: "sage" },
-  { id: "birds", name: "Birdsong", icon: Bird, volume: 12, enabled: true, color: "peach" },
+const TRACK_META = {
+  rain: { id: "rain", name: "Rain", icon: CloudRain, color: "blue" },
+  wind: { id: "wind", name: "Soft Wind", icon: Wind, color: "lavender" },
+  cafe: { id: "cafe", name: "Quiet Cafe", icon: Coffee, color: "sage" },
+  birds: { id: "birds", name: "Birdsong", icon: Bird, color: "peach" },
+};
+
+const DEFAULT_TRACK_SETTINGS = [
+  { id: "rain", volume: 65, enabled: true },
+  { id: "wind", volume: 25, enabled: true },
+  { id: "cafe", volume: 20, enabled: true },
+  { id: "birds", volume: 12, enabled: true },
 ];
+
+function hydrateTracks(settings) {
+  const byId = new Map((settings || DEFAULT_TRACK_SETTINGS).map((track) => [track.id, track]));
+  return DEFAULT_TRACK_SETTINGS.map((fallback) => {
+    const saved = byId.get(fallback.id) || fallback;
+    return {
+      ...TRACK_META[fallback.id],
+      volume: Number.isFinite(Number(saved.volume)) ? Number(saved.volume) : fallback.volume,
+      enabled: typeof saved.enabled === "boolean" ? saved.enabled : fallback.enabled,
+    };
+  });
+}
+
+const DEFAULT_TRACKS = hydrateTracks(DEFAULT_TRACK_SETTINGS);
 
 const BASE_PRESETS = [
   {
@@ -70,10 +91,14 @@ const TIMERS = [
 function loadSavedTracks() {
   try {
     const saved = localStorage.getItem(STORAGE_TRACKS);
-    return saved ? JSON.parse(saved) : DEFAULT_TRACKS;
+    return saved ? hydrateTracks(JSON.parse(saved)) : DEFAULT_TRACKS;
   } catch {
     return DEFAULT_TRACKS;
   }
+}
+
+function serializeTracks(tracks) {
+  return tracks.map(({ id, volume, enabled }) => ({ id, volume, enabled }));
 }
 
 function loadCustomPreset() {
@@ -141,7 +166,7 @@ function App() {
   }, [timer, isPlaying, timeLeft]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_TRACKS, JSON.stringify(tracks));
+    localStorage.setItem(STORAGE_TRACKS, JSON.stringify(serializeTracks(tracks)));
   }, [tracks]);
 
   useEffect(() => {
@@ -498,7 +523,7 @@ function App() {
 }
 
 function SoundControl({ track, onToggle, onVolume }) {
-  const Icon = track.icon;
+  const Icon = track.icon || CloudRain;
 
   return (
     <article className={`track ${track.color}`}>
