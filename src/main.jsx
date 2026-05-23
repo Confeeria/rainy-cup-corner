@@ -415,12 +415,6 @@ function App() {
         </section>
 
         <section className="card topPlayback">
-          <div>
-            <span className={`playStatus ${isPlaying ? "active" : ""}`}>
-              {playbackStatus}
-            </span>
-          </div>
-
           <button
             className="play"
             onClick={isPlaying ? pausePlayback : startPlayback}
@@ -428,6 +422,13 @@ function App() {
           >
             {isPlaying ? <Pause size={30} /> : <Play size={30} />}
           </button>
+
+          <div className="playCopy">
+            <span className={`playStatus ${isPlaying ? "active" : ""}`}>
+              {playbackStatus}
+            </span>
+            <p>{isPlaying ? "Your cozy mix is running." : "Tap play to start your mix."}</p>
+          </div>
         </section>
 
         <section className="card presetSection">
